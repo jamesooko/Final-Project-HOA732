@@ -1,0 +1,715 @@
+---
+title: "Final Project"
+author: "James Ooko"
+date: "2025-05-02"
+output: pdf_document
+---
+
+# Question 1
+## Part a
+```{r}
+library(readr)    #This will help read the csv file in r
+Da <- read_csv("Real estate valuation data set.csv")
+head(Da)
+dim(Da)
+names(Da)
+summary(Da)
+```
+```{r}
+colnames(Da) <- c("No",       # ignore this because it is not used in the analysis
+                    "X1",    # the transaction date → X1 (Transaction date)
+                    "X2",    # the house age → X2 (House age)
+                    "X3",    # Dist.MRT → X3 (Distance to MRT)
+                    "X4",    # N.Cstores → X4 (Number of convenience stores)
+                    "X5",    # the geographic coordinate, latitude → X5 (Latitude)
+                    "X6",    # the geographic coordinate, longitude → X6 (Longitude)
+                    "Dist",  # Dist → Dist (Distance to downtown)
+                    "Y")     # Y → Y (House price per unit area)
+```
+
+
+```{r split data into training and test sets}
+M <- .25*nrow(Da)
+set.seed(1197317)
+holdout <- sample(1:nrow(Da), M, replace=F)
+Da.train <- Da[-holdout, ] 
+Da.test <- Da[holdout, ] 
+dim(Da.train)
+dim(Da.test) 
+```
+
+
+```{r}
+library(carData)
+lm1 <- lm(Y~X2+X3+X4+Dist, data=Da.train)
+summary(lm1)
+library(car)
+vif(lm1)
+```
+After running the first multiple linear regression with Y as the response variable and X2, X3, X4, and Dist as the predictor variables, all the VIFs are less than 5, indicating that multicollinearity is not a concern. The p-values for all predictors are less than 0.05, meaning each variable significantly contributes to the model at the 5% significance level. 
+
+
+lm1 is our final model (all VIF < 5, each P-value < 0.05).
+
+Verify assumption of linearity from the filam MLR model lm2.
+
+```{r}
+df <- as.data.frame(lm1$residuals)
+colnames(df)[1] <- "residuals"
+library(ggplot2)
+shapiro.test(df$residuals) 
+
+ggplot(df)+stat_qq(aes(sample=residuals)) + 
+  geom_qq_line(aes(sample=residuals))+
+  annotate("text", x=0.5, y=4000, label = "Shapiro-test p-value = 0.33", color="red")
+```
+The Shapiro-Wilk normality test was conducted on the residuals of the model to assess whether they follow a normal distribution—a key assumption in multiple linear regression. The test yielded a W statistic of 0.84022 and a p-value less than 2.2e-16. Since the p-value is significantly less than 0.05, we reject the null hypothesis of normality. This suggests that the residuals are not normally distributed, which may affect the validity of inference statistics such as confidence intervals and p-values in the regression model.
+`
+```{r}
+library(ggfortify)
+autoplot(lm1)
+```
+The diagnostic plots suggest several concerns with the regression model assumptions. The Residuals vs Fitted plot shows a slight curve, indicating potential non-linearity. The Normal Q-Q plot reveals deviations from the diagonal line, especially in the upper tail, supporting the earlier Shapiro-Wilk test result that residuals are not normally distributed. The Scale-Location plot displays some heteroscedasticity (non-constant variance) as the spread of residuals increases slightly with fitted values. The Residuals vs Leverage plot identifies a few high-leverage points (e.g., observations 199 and 232), but none appear to be extreme outliers with undue influence. Overall, the model violates assumptions of normality and potentially homoscedasticity.
+
+
+
+
+```{r}
+RMSE <- function(Y,Yhat)
+{
+n <- length(Yhat)
+MSE <- sum((Y- Yhat)**2)/n  
+RMSE <- sqrt(MSE)
+r <- cor(Y,Yhat)
+R_square <- r**2
+temp <- c(R_square,RMSE)
+names(temp) <- c("R_Square","RMSE")
+return(temp)  
+} 
+```
+
+
+```{r performance measures for train and test sets, linear model}
+source("RMSE.r")
+lmF <- lm1
+Y.train <- Da.train$Y
+Y.test <- Da.test$Y
+Yhat.train_lm <- lmF$fitted.values
+Yhat.test_lm <- predict(lmF,Da.test)
+RMSE.train_lm <- RMSE(Y.train,Yhat.train_lm)
+RMSE.test_lm <- RMSE(Y.test,Yhat.test_lm)
+df.RMSE_lm <- rbind.data.frame(RMSE.train_lm,RMSE.test_lm)
+colnames(df.RMSE_lm) <- c("lm.R_Square","lm.RMSE")
+rownames(df.RMSE_lm) <- c("train","test")
+df.RMSE_lm
+```
+
+The model evaluation metrics show that the regression model performs better on the test set than on the training set, which is somewhat unusual but possible. The R-squared on the training data is approximately 0.54, indicating that the model explains about 54% of the variance in the training data. On the test data, the R-squared improves to 0.67, suggesting better generalization performance. Similarly, the Root Mean Square Error (RMSE) decreases from 9.40 on the training set to 7.37 on the test set, indicating lower prediction error on new data. This may suggest that the model is not overfitting and possibly underfitting the training data slightly, or that the test data happens to align more closely with the model assumptions. Further cross-validation would help confirm the model's robustness.
+
+
+
+
+## Part b
+```{r read data d1b}
+D1b <- read.csv("Real estate valuation data set.csv")
+dim(D1b)
+names(D1b)
+head(D1b)
+summary(D1b)
+```
+```{r}
+# Rename columns to match question description
+colnames(D1b) <- c("No", "X1", "X2", "X3", "X4", "X5", "X6", "Dist", "Y")
+# Select only relevant predictors
+D1b <- D1b[, c("X2", "X3", "X4", "Dist", "Y")]
+colnames(D1b) <- c("Age", "Dist.MRT", "N.Cstores", "Dist", "Y")
+```
+
+
+```{r function to normalize predictors}
+normalize <- function(x) 
+{
+x <- na.omit(x)
+return ((x - min(x)) / (max(x) - min(x)))
+}
+
+D1b$Age <- normalize(D1b$Age)
+D1b$Dist.MRT <- normalize(D1b$Dist.MRT)
+D1b$N.Cstores <- normalize(D1b$N.Cstores)
+D1b$Dist <- normalize(D1b$Dist)
+```
+
+
+```{r create dummy columns and formula}
+Formula0 <- Y ~ Age + Dist.MRT + N.Cstores + Dist
+Formula0
+```
+```{r split data set}
+# -------------------------------------------------------
+M <- trunc(.25*nrow(D1b)) 
+
+# to be able to replicate the results, set initial seed for random 
+# number generator
+set.seed(1197317)
+holdout <- sample(1:nrow(D1b), M, replace=F)
+D1b.train <- D1b[-holdout, ]   # Training set 784   8
+D1b.test <-  D1b[holdout, ]    # Test set  of 261   8
+dim(D1b.train)
+dim(D1b.test)
+```
+
+```{r fit model}
+# install.packages("e1071")
+library(e1071)
+svm1 <-svm(Formula0, kernel = "radial", data=D1b.train)
+print(svm1) 
+names(svm1)
+```
+The output summarizes the configuration of a support vector machine (SVM) model using epsilon-regression with a radial basis function (RBF) kernel. The model was trained on D1b.train using default hyper parameters: cost = 1, gamma = 0.25, and epsilon = 0.1, which control the margin tolerance, kernel flexibility, and prediction insensitivity zone, respectively. A total of 250 support vectors were used, indicating how many training observations lie on or within the margin and influence the model. The list of attributes at the bottom shows the various components stored in the SVM model object, including support vectors, coefficients, fitted values, and residuals. This output confirms the successful creation and training of the SVM regression model, but does not include performance metrics, which would need to be computed separately
+```{r}
+# SVM performance can be improved further by tuning the SVM
+# I performed a grid search to tune(optimize) SVM HYPERPARAMETERS
+tune.svm <- tune(svm, Formula0,
+            kernel = "radial", data=D1b.train,
+            ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9)))
+print(tune.svm)
+# Draw the tuning graph
+plot(tune.svm)
+```
+
+```{r}
+tune.svm2 <- tune(svm, Formula0,
+            kernel = "radial", data=D1b.train,
+            ranges = list(epsilon = seq(0,0.18,0.02), cost = seq(2,10,2)))
+
+plot(tune.svm2)
+tune.svm2
+```
+```{r fit final }
+svmF <- svm(Formula0,
+            kernel = "radial", data=D1b.train,
+            ranges = list(epsilon = 0.025, cost = 4))
+
+svmF
+```
+
+```{r performance measures for train and test sets, svm model}
+source("RMSE.r")
+Y.train <- D1b.train$Y
+Y.test <- D1b.test$Y
+Yhat.train_svm <- svmF$fitted
+Yhat.test_svm <- predict(svmF,D1b.test)
+RMSE.train_svm <- RMSE(Y.train,Yhat.train_svm)
+RMSE.test_svm <- RMSE(Y.test,Yhat.test_svm)
+df.RMSE_svm <- rbind.data.frame(RMSE.train_svm,RMSE.test_svm)
+colnames(df.RMSE_svm) <- c("svm.R_Square","svm.RMSE")
+rownames(df.RMSE_svm) <- c("train","test")
+df.RMSE_svm
+```
+The SVM model performs well, with better results on the test set than the training set: R² = 0.79 and RMSE = 6.00 on the test data, showing good predictive accuracy and generalization.
+
+
+## Part c
+```{r plot y, Yhat_lm, Yhat_svm for training set}
+source("plot.y_yhat.r")
+library(ggplot2)
+y.train <- D1b.train$Y
+Yhat1 <- Yhat.train_lm
+Yhat2 <- Yhat.train_svm
+p <- plot.y_yhat(y.train,Yhat1,Yhat2,"SVM")
+p + ggtitle("Observed and Predicted Price Using MLR and SVM\nDiamond Data Training Set")
+``` 
+```{r plot y, Yhat_lm, Yhat_svm for test set}
+source("plot.y_yhat.r")
+y.test <- Da.test$Y
+yhat.test_lm <- predict(lm1,Da.test)
+yhat.test_svm <- predict(svmF,D1b.test)
+p <- plot.y_yhat(y.test,yhat.test_lm,yhat.test_svm,"SVM")
+p + ggtitle("Observed and Predicted Price Using MLR and SVM\nDiamond Data Test Set")
+``` 
+SVM is clearly the better model in SVM case, consistently providing higher accuracy (R²) and lower error (RMSE) on both training and test sets compared to MLR.
+
+
+# Question 2
+## Part a
+```{r Question 2: Logistic regression}
+D2a <- read.csv("Bank.1.csv")
+head(D2a)
+```
+
+```{r check whether there is missing values in the dataset}
+n.NA <- colSums(is.na(D2a))
+n.NA
+```
+There was no missing values in the given data set therefore nothing to worry about. We will go ahead to split the data into test and train data set for consistency
+
+```{r}
+M <- .25*nrow(D2a)  
+set.seed(117317)
+holdout <- sample(1:nrow(D2a), M, replace=F)
+
+D2a.train <- D2a[-holdout, ] 
+D2a.test <-  D2a[holdout, ]  
+dim(D2a.train) 
+dim(D2a.test) 
+```
+Our dataset was divided into 3391 training datapoints and 1130 test points with 18 variables (y which is binary is the response variable and the remaining will be the predictors.)
+
+```{r}
+# Convert y to factor
+D2a.train$y <- as.factor(D2a.train$y)
+
+# Fit logistic regression
+LR1 <- glm(y ~ age + job + marital + education + default + balance + housing + loan + contact + campaign + pdays + previous + poutcome, 
+           data = D2a.train, 
+           family = binomial)
+
+# Check summary and multicollinearity
+summary(LR1)
+library(car)
+vif(LR1)
+
+```
+
+poutcome GVIF>5 indicating multicollinearity problem. The logistic regression identified marital status, housing loan, personal loan, contact type, campaign frequency, and past outcome as significant predictors of subscription, with no evidence of problematic multicollinearity
+
+
+```{r }
+# Drop 'default'
+LR2 <- glm(formula = y ~ age + job + marital + education + default + 
+    balance + housing + loan + contact + campaign + pdays + previous,
+    family = binomial, 
+    data = D2a.train)
+
+# Check summary and VIF again
+summary(LR2)
+library(car)
+vif(LR2)
+```
+After removing poutcome, the logistic regression model now has all GVIF values comfortably below 5, confirming that multicollinearity is no longer a concern. However, this came at the cost of slightly reduced model performance, with the residual deviance increasing from 2103.0 to 2214.5 and AIC from 2163 to 2268.5, indicating a worse fit. Additionally, several predictors remain statistically insignificant, such as age, most job categories, and balance, while important variables like housingyes, loanyes, contactunknown, campaign, and previous remain significant.
+```{r}
+# Fit the initial full model (without poutcome)
+full_model <- glm(y ~ age + job + marital + education + default + 
+                  balance + housing + loan + contact + campaign + 
+                  pdays + previous,
+                  family = binomial, data = D2a.train)
+
+# Perform stepwise selection based on AIC
+stepwise_model <- step(full_model, direction = "both")
+
+# Display the summary of the selected model
+summary(stepwise_model)
+
+# Check GVIFs again to confirm multicollinearity is still acceptable
+library(car)
+vif(stepwise_model)
+```
+
+
+
+```{r}
+observed.train <- D2a.train$y
+predicted.train <-predict(full_model, D2a.train, type = 'response')
+predicted.train <- round(predicted.train)
+
+#Predict testing data using the final model lr2
+observed.test <- D2a.test$y
+predicted.test <-predict(full_model, D2a.test, type = 'response')
+predicted.test <- round(predicted.test)
+
+CM.train <- table(D2a.train$y, predicted.train)
+CM.test <- table(D2a.test$y, predicted.test)
+
+CM.train
+CM.test
+```
+The model performs very well at identifying "no" cases but struggles significantly with "yes" cases. In the training set, it correctly classifies 3001 "no" instances and only 2 "yes" instances, while misclassifying 386 "yes" cases as "no." Similarly, in the test set, it correctly predicts 996 "no" and only 1 "yes," while misclassifying 132 "yes" instances. This indicates a strong class imbalance or a model that is biased toward predicting the majority class ("no"), resulting in poor recall for the minority class ("yes").
+
+
+```{r}
+Y.obs<-D2a.train$y
+Y.pred <- full_model$fitted.values
+Y.pred<-round(Y.pred,0)
+CM.LR<-table(Y.obs,Y.pred) #confusion matrix
+CM.LR
+OA.LR<-sum(diag(CM.LR)/sum(CM.LR))   #Overall accuracy
+print("Overall accuray of Logistic regression model") 
+OA.LR
+```
+ logistic regression model was evaluated, and the overall accuracy (OA.LR) was found to be 0.886 (or 88.6%). The model correctly classified 88.6% of the observations in the dataset.
+```{r}
+library(rpart)
+library("rpart.plot")
+fit<-rpart(y ~ age + housing + loan + campaign + poutcome, data = D2a.train, method = 'class')
+rpart.plot(fit)
+names(fit)
+Y.pred.DT <- predict(fit)
+str(Y.pred.DT)
+Y.pred.DT<-as.data.frame(Y.pred.DT)
+T.pred.DT<-round(Y.pred.DT[,2],0)
+```
+```{r}
+CM.DT<-table(Y.obs,T.pred.DT)
+CM.DT
+```
+The model performs very well at identifying "no" cases but struggles significantly with "yes" cases. In the training set, it correctly classifies 3001 "no" instances and only 2 "yes" instances, while misclassifying 386 "yes" cases as "no." Similarly, in the test set, it correctly predicts 996 "no" and only 1 "yes," while misclassifying 132 "yes" instances. This indicates a strong class imbalance or a model that is biased toward predicting the majority class ("no"), resulting in poor recall for the minority class ("yes").
+
+
+## Part b
+```{r}
+# Load data
+D2b <- read.csv("Bank.1.csv")
+head(D2b)
+dim(D2b)
+names(D2b)
+summary(D2b)
+```
+```{r}
+# Check categories
+table(D2b$job)
+table(D2b$marital)
+table(D2b$education)
+table(D2b$default)
+table(D2b$housing)
+table(D2b$loan)
+table(D2b$contact)
+table(D2b$poutcome)
+table(D2b$y)  # this is your target: yes/no
+```
+
+
+
+
+```{r dummy code categorical variable}
+#install.packages("fastDummies")
+library(fastDummies)
+D2b_dummies <- dummy_cols(D2b, 
+                         select_columns = c("job", "marital", "education", "default", 
+                                            "housing", "loan", "contact",  "poutcome"), 
+                         remove_first_dummy = TRUE)
+head(D2b_dummies)
+dim(D2b_dummies)
+names(D2b_dummies)
+
+```
+
+```{r}
+# Combine selected variables; adjust as needed
+D <- cbind.data.frame(
+  y = D2b$y,
+  age = D2b$age,
+  balance = D2b$balance,
+  duration = D2b$duration,
+  D2b_dummies[, grep("job_|marital_|education_|default_|housing_|loan_|contact_|poutcome_", names(D2b_dummies))]
+)
+
+# Convert target to binary (if needed)
+D2b$y <- ifelse(D2b$y == "yes", 1, 0)
+
+head(D2b)
+dim(D2b)
+
+```
+
+
+```{r}
+set.seed(117317)
+M <- floor(0.25 * nrow(D2b))
+holdout <- sample(1:nrow(D2b), M, replace = FALSE)
+
+D2b.train <- D2b[-holdout, ]
+D2b.test <- D2b[holdout, ]
+dim(D2b.train)
+dim(D2b.test)
+```
+
+
+
+
+
+```{r}
+#install.packages("randomForest")
+library(randomForest)
+rf1 <- randomForest(y ~ ., data = D2b.train, ntree = 500)
+print(rf1)
+names(rf1)
+```
+This random forest regression model explains about 31.7% of the variance in the target variable, with a mean squared error of 0.069. It captures some patterns in the data but has limited predictive accuracy, suggesting room for improvement.
+
+```{r write a user defined functon RMSE }
+RMSE <- function(obs, pred) {
+  sqrt(mean((obs - pred)^2))
+}
+ytest.obs <- D2b.test$y
+ytest.pred <- predict(rf1, D2b.test)
+RMSE(ytest.obs, ytest.pred)
+```
+The RMSE value of 0.2758 indicates that, on average, the model’s predictions deviate from the actual values by about 0.28 units. This gives a sense of the model’s prediction error in the same scale as the response variable — lower RMSE values indicate better predictive accuracy.
+
+```{r}
+RMSE(1,1)
+RMSE(1,6)
+```
+```{r}
+ytrain.obs <- D2b.train$y
+ytrain.pred <- rf1$predicted
+RMSE(ytrain.obs,ytrain.pred)
+```
+The model's predictions on the training data have an RMSE of 0.263, indicating good fit with relatively low error.
+```{r}
+ytest.obs <- D2b.test$y
+ytest.pred <- predict(rf1, newdata = D2b.test[, setdiff(names(D2b.test), "y")])
+library(Metrics)
+RMSE(ytest.obs, ytest.pred)
+
+```
+On unseen test data, the RMSE slightly increases to 0.276, suggesting the model generalizes reasonably well without severe overfitting.
+```{r}
+D1_plot <- data.frame(Set = "Train", Actual = ytrain.obs, Predicted = ytrain.pred)
+D2_plot <- data.frame(Set = "Test", Actual = ytest.obs, Predicted = ytest.pred)
+D3_plot <- rbind(D1_plot, D2_plot)
+
+library(ggplot2)
+ggplot(D3_plot, aes(x = Actual, y = Predicted, color = Set)) + 
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Actuals vs Predicted",
+       x = "Actual Values",
+       y = "Predicted Values") +
+  theme_minimal()
+```
+
+
+
+## Part C
+```{r read data d1c}
+library(dplyr)
+D2c <- read.csv("Bank.1.csv")
+dim(D2c) 
+names(D2c)
+head(D2c)
+summary(D2c)
+D2c$pdays_cat <- ifelse(D2c$pdays == 999, "not_contacted", "contacted")
+D2c$pdays_cat <- as.factor(D2c$pdays_cat)
+```
+
+
+```{r}
+predictors.cat <- c("job", "marital", "education", "default", 
+                    "housing", "loan", "contact", "poutcome")
+predictors.con <- c("age", "balance", "campaign", "pdays", "previous")
+D2c.cat <- D2c[predictors.cat]
+D2c.con <- D2c[predictors.con]
+```
+
+```{r normalize continuous predictors}
+source("normalize.r")
+D2c.Z <- apply(D2c[predictors.con],2,normalize)
+summary(D2c.Z)
+```
+```{r}
+library(fastDummies)
+D2c <- dummy_cols(D2c, remove_first_dummy=TRUE)
+names(D2c)
+```
+```{r split data}
+# -------------------------------------------------------
+M <- trunc(.25*nrow(D2c)) 
+
+# to be able to replicate the results, set initial seed for random 
+# number generator
+set.seed(1797317)
+holdout <- sample(1:nrow(D2c), M, replace=F)
+D2c.train <- D2c[-holdout, ]   
+D2c.test <-  D2c[holdout, ]    
+dim(D2c.train)
+dim(D2c.test)
+```
+
+```{r}
+# Drop y and any y-related dummy columns
+drop_vars <- c("job", "marital", "education", "default", 
+               "housing", "loan", "contact", "month", "poutcome", "y")
+
+# Exclude y and dummy vars like y_yes
+D2c_gbm <- D2c[, !(grepl("^y(_|$)", names(D2c))) & !(names(D2c) %in% drop_vars)]
+D2c_gbm <- D2c_gbm[, sapply(D2c_gbm, function(col) length(unique(col)) > 1)] # Drop constant columns from D2c_gbm
+
+# Add clean binary target
+D2c_gbm$y <- ifelse(D2c$y == "yes", 1, 0)
+
+features2c <- setdiff(names(D2c_gbm), "y")
+Formula2c <- as.formula(paste("y ~", paste(features2c, collapse = " + ")))
+```
+```{r}
+library(gbm)
+gbm_model <- gbm(
+  formula = Formula2c,
+  data = D2c_gbm,
+  distribution = "bernoulli",
+  n.trees = 3000,
+  shrinkage = 0.01,
+  interaction.depth = 4,
+  verbose = FALSE
+)
+
+
+
+smreGB1 <- summary(gbm_model, plotit = FALSE)
+
+
+if (nrow(smreGB1) > 0 && any(smreGB1$rel.inf > 0)) {
+  smreGB1 <- smreGB1[order(-smreGB1$rel.inf), ][1:10, ]
+  smreGB1$Variable <- factor(smreGB1$var, levels = smreGB1$var)
+  
+  library(ggplot2)
+  ggplot(smreGB1, aes(x = Variable, y = rel.inf)) +
+    geom_bar(stat = 'identity', fill = "skyblue") +
+    coord_flip() +
+    ylab("Relative Influence") + 
+    xlab("Variables") +
+    ggtitle("GBM Variable Importance")
+} else {
+  message("No variable importance data available to plot.")
+}
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+inf.sort <- smreGB1[order(smreGB1[,"rel.inf"]), , drop = FALSE]
+#write.csv(VIrf1.sort,"VIrf1 120118.csv")
+inf.sort$X <- rownames(inf.sort)
+inf.sort$X <- factor(inf.sort$X, levels = inf.sort$X)
+
+# Influence Plot in ggplot2
+library(ggplot2)
+ggplot(inf.sort,aes(x=X,y=rel.inf))+
+geom_bar(stat = 'identity', position = 'dodge', fill="lightblue")+
+theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+ylab("Mean Decrease in Gini Index") + xlab("Predictor")+
+ggtitle("Variable Influence Plot for Gradient Boosting")
+
+```
+
+```{r performance measures for train and test sets, gradient boosting model}
+source("RMSE.r")
+Y.train <- ifelse(D2c.train$y == "yes", 1, 0)
+Y.test  <- ifelse(D2c.test$y == "yes", 1, 0)
+Yhat.train_gbm <- predict(gbm_model, newdata = D2c.train, n.trees = gbm_model$n.trees)
+Yhat.test_gbm  <- predict(gbm_model, newdata = D2c.test, n.trees = gbm_model$n.trees)
+RMSE.train_gbm <- RMSE(Y.train,Yhat.train_gbm)
+RMSE.test_gbm <- RMSE(Y.test,Yhat.test_gbm)
+df.RMSE_gbm <- rbind.data.frame(RMSE.train_gbm,RMSE.test_gbm)
+colnames(df.RMSE_gbm) <- c("gbm.R_Square","gbm.RMSE")
+rownames(df.RMSE_gbm) <- c("train","test")
+df.RMSE_gbm
+```
+The GBM model shows moderate predictive performance, explaining around 45–51% of the variance. The similar RMSE values on train and test sets (\~3.6) suggest good generalization with no major overfitting.
+
+```{r}
+sapply(D2c.train[, setdiff(names(D2c.train), "y")], class)
+```
+
+
+```{r}
+#install.packages("xgboost")
+D2c.train <- D2c.train[, sapply(D2c.train, is.numeric)]
+D2c.test  <- D2c.test[, sapply(D2c.test, is.numeric)]
+train.y <- D2c.train$y
+test.y <- D2c.test$y
+library(xgboost)
+E2.train <- as.matrix(D2c.train[,-1])
+E2.test <- as.matrix(D2c.test[,-1])
+
+dTrain <- xgb.DMatrix(data = E2.train, label= train.y)  # this specifies response is Train.Y
+dTest <-  xgb.DMatrix(data = E2.test,   label= test.y)  # this specifies response is Test.Y
+
+```
+```{r tune the xgboost model}
+set.seed(311317)
+searchGridSubCol <- expand.grid(subsample = c(0.5, 0.6), 
+                                colsample_bytree = c(0.5, 0.6),
+                                max_depth = c(3, 4),
+                                min_child = seq(1), 
+                                eta = c(0.1)
+)
+
+
+```
+
+```{r tune the xgboost model 2}
+#
+set.seed(11317)
+searchGridSubCol <- expand.grid(subsample = c(0.5, 0.6), 
+                                colsample_bytree = c(0.5, 0.6),
+                                max_depth = c(3, 4),
+                                min_child = seq(1), 
+                                eta = c(0.1)
+)
+ntrees <- 50
+
+system.time(
+rmseErrorsHyperparameters <- apply(searchGridSubCol, 1, function(parameterList){
+  
+  #Extract Parameters to test
+  currentSubsampleRate <- parameterList[["subsample"]]
+  currentColsampleRate <- parameterList[["colsample_bytree"]]
+  currentDepth <- parameterList[["max_depth"]]
+  currentEta <- parameterList[["eta"]]
+  currentMinChild <- parameterList[["min_child"]]
+  xgboostModelCV <- xgb.cv(data =  dTrain, nrounds = ntrees, nfold = 5, showsd = TRUE, 
+                       metrics = "rmse", verbose = TRUE, "eval_metric" = "rmse",
+                     "objective" = "reg:squarederror", "max.depth" = currentDepth, "eta" = currentEta,                               
+                     "subsample" = currentSubsampleRate, "colsample_bytree" = currentColsampleRate
+                      , print_every_n = 10, "min_child_weight" = currentMinChild, booster = "gbtree",
+                     early_stopping_rounds = 10)
+  
+  xvalidationScores <- as.data.frame(xgboostModelCV$evaluation_log)
+  rmse <- tail(xvalidationScores$test_rmse_mean, 1)
+  trmse <- tail(xvalidationScores$train_rmse_mean,1)
+  output <- return(c(rmse, trmse, currentSubsampleRate, currentColsampleRate, currentDepth, currentEta, currentMinChild))}))
+
+output <- as.data.frame(t(rmseErrorsHyperparameters))
+varnames <- c("TestRMSE", "TrainRMSE", "SubSampRate", "ColSampRate", "Depth", "eta", "MinChildWeight")
+names(output) <- varnames
+output # ntree = 50
+```
+Test RMSE decreases steadily, indicating that the model improves with more trees.
+Final test RMSE values (~0.03–0.05) suggest high accuracy and good performance across parameter combinations.
+```{r}
+# Final XGBoost model with best parameters
+set.seed(11371)
+ntree <- 50
+
+xgbF <- xgboost(
+  data = dTrain,
+  nrounds = ntree,
+  subsample = 0.6,
+  colsample_bytree = 0.6,
+  max_depth = 4,
+  eta = 0.1,
+  min_child_weight = 1,
+  objective = "reg:squarederror",
+  verbose = 1
+)
+```
+
+```{r predict using final xgboost model xgbF}
+
+pred.train_xgb <- predict(xgbF, dTrain)
+pred.test_xgb <- predict(xgbF, dTest)
+#RMSE <- function(Y,Yhat)
+RMSR.train_xgb <- RMSE(train.y,pred.train_xgb)
+RMSR.test_xgb <- RMSE(test.y,pred.test_xgb)
+RMSR.train_xgb
+RMSR.test_xgb
+```
+The XGBoost model performs extremely well, with very high R-squared values on both training (0.997) and test (0.996) sets. This means it explains nearly all the variation in the data. The low RMSE values (~0.02–0.03) show that prediction errors are very small.
