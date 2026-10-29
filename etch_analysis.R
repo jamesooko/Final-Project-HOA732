@@ -1,0 +1,10 @@
+library(readxl)
+out<-'etch_results';dir.create(out,showWarnings=FALSE)
+# Plasma etching textbook example, analyzed in James Ooko's coursework.
+e<-data.frame(Power=rep(c(160,180,200,220),each=5),EtchRate=c(575,542,530,539,570,565,593,590,579,610,600,651,610,637,629,725,700,715,685,710));e$Power<-factor(e$Power)
+stopifnot(nrow(e)==20,!anyNA(e),all(table(e$Power)==5))
+m<-aov(EtchRate~Power,e);t<-as.data.frame(TukeyHSD(m)$Power);t$comparison<-rownames(t)
+s<-aggregate(EtchRate~Power,e,function(x)c(mean=mean(x),sd=sd(x),n=length(x)));s<-data.frame(Power=s$Power,s$EtchRate)
+write.csv(s,file.path(out,'etch_summary.csv'),row.names=FALSE);write.csv(t,file.path(out,'etch_tukey.csv'),row.names=FALSE)
+write.csv(data.frame(F=summary(m)[[1]]$'F value'[1],p=summary(m)[[1]]$'Pr(>F)'[1],shapiro_p=shapiro.test(resid(m))$p.value,fligner_p=fligner.test(EtchRate~Power,e)$p.value),file.path(out,'etch_tests.csv'),row.names=FALSE)
+png(file.path(out,'etch_chart.png'),width=1500,height=800,res=150);par(mar=c(4,5,3,1));plot(rep(as.numeric(levels(e$Power)),each=5),e$EtchRate,xlab='RF power (watts)',ylab='Etch rate (angstrom/min)',main='Etch rate by power setting',pch=16,col='#008D98',xaxt='n');axis(1,at=c(160,180,200,220));lines(as.numeric(as.character(s$Power)),s$mean,col='#0B172A',lwd=2);legend('topleft',c('Observed replicate','Group mean'),pch=c(16,NA),lty=c(NA,1),col=c('#008D98','#0B172A'),bty='n');dev.off()

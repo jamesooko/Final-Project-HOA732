@@ -2,7 +2,7 @@
 
 **James Ooko** | [LinkedIn](https://www.linkedin.com/in/james-ooko-056124194/) | [GitHub](https://github.com/jamesooko)
 
-Reviewed portfolio revisions of my completed HOA 732 coursework. The original submitted R Markdown remains in the repository. The files below contain corrected, runnable analyses and checked results prepared in October 2026.
+Reviewed portfolio revisions of my completed R coursework in analytics, machine learning, and experimental design. The original submitted R Markdown remains in the repository. The files below contain corrected, runnable analyses and checked results prepared in October 2026.
 
 ## Projects
 
@@ -12,6 +12,16 @@ Reviewed portfolio revisions of my completed HOA 732 coursework. The original su
 | [Bank marketing](BANK_MARKETING.md) | Can pre-call information identify term-deposit subscribers? | Binomial logistic regression, pruned classification tree, validation-selected thresholds | Logistic test ROC AUC 0.710; subscriber recall 0.267 |
 
 Results are limited to the documented datasets and random splits. These are educational analyses, not deployed valuation or customer-targeting systems.
+
+## Additional completed R projects
+
+| Project | Methods | Checked finding |
+| --- | --- | --- |
+| [RF power and etch rate](EXPERIMENTAL_DESIGN.md) | One-way ANOVA, Tukey comparisons, residual diagnostics | Four tested settings have different means; F(3,16) = 66.80 |
+| [MTA ridership](MTA_RIDERSHIP.md) | Data checks, distributions, monthly summaries | 1,706 consecutive daily records, March 2020 to October 2024 |
+| [Occupancy receipts](OCCUPANCY_RECEIPTS.md) | Ordered monthly boxplots and medians | October has the highest pooled monthly median in the supplied snapshot |
+
+These additions use a textbook example and historical coursework snapshots. Their pages document source attribution, reporting limitations, and the occupancy file’s inconsistent fiscal-year labels.
 
 ## Run
 
@@ -27,6 +37,9 @@ From the repository root:
 Rscript download_data.R
 Rscript real_estate_analysis.R
 Rscript bank_marketing_analysis.R
+Rscript etch_analysis.R
+Rscript mta_analysis.R
+Rscript occupancy_analysis.R
 ```
 
 Each project writes its calculations to its own `real_estate_results/` or `bank_marketing_results/` folder. Expected results and runtime versions are included. Seeds and splits are set in the scripts. Small numerical differences can occur across R/package versions.
@@ -40,7 +53,7 @@ Each project writes its calculations to its own `real_estate_results/` or `bank_
 
 ## Data and attribution
 
-Data are downloaded from UCI rather than silently republishing local course files.
+For the first two projects, data are downloaded from UCI. The additional projects include explicitly identified historical snapshots and an embedded numerical textbook example. See each project page for provenance and limits.
 
 - Yeh, I. (2018). *Real Estate Valuation*. UCI Machine Learning Repository. https://doi.org/10.24432/C5J30W. [Source and CC BY 4.0 notice](https://archive.ics.uci.edu/dataset/477/real%26).
 - Moro, S., Rita, P., & Cortez, P. (2014). *Bank Marketing*. UCI Machine Learning Repository. https://doi.org/10.24432/C5K306. [Source and CC BY 4.0 notice](https://archive.ics.uci.edu/dataset/222/bank+marketing).
