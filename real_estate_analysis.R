@@ -1,0 +1,20 @@
+library(e1071)
+d <- read.csv('real_estate_data.csv')
+dir.create('real_estate_results',showWarnings=FALSE)
+stopifnot(nrow(d)==414, !anyNA(d), !anyDuplicated(d$No))
+f <- Y ~ Age + Dist.MRT + N.Cstores
+set.seed(1197317)
+idx <- sample(seq_len(nrow(d)),floor(.25*nrow(d)))
+tr <- d[-idx,]; te <- d[idx,]
+lm_fit <- lm(f,tr)
+set.seed(1197317)
+tuned <- tune(svm,f,data=tr,kernel='radial',ranges=list(cost=c(.25,1,4,16,64),epsilon=c(.01,.05,.1,.2)),tunecontrol=tune.control(cross=5))
+svm_fit <- tuned$best.model
+p1 <- predict(lm_fit,te); p2 <- predict(svm_fit,te)
+met <- function(p) c(RMSE=sqrt(mean((te$Y-p)^2)),MAE=mean(abs(te$Y-p)),R2=1-sum((te$Y-p)^2)/sum((te$Y-mean(te$Y))^2))
+metrics <- rbind(Linear_regression=met(p1),Radial_SVM=met(p2)); write.csv(metrics,'real_estate_results/metrics.csv')
+write.csv(data.frame(actual=te$Y,linear=p1,svm=p2),'real_estate_results/predictions.csv',row.names=FALSE)
+write.csv(tuned$best.parameters,'real_estate_results/best_parameters.csv',row.names=FALSE)
+write.csv(data.frame(train=nrow(tr),test=nrow(te),missing=sum(is.na(d)),duplicates=sum(duplicated(d$No))),'real_estate_results/data_checks.csv',row.names=FALSE)
+capture.output(sessionInfo(),file='real_estate_results/sessionInfo.txt')
+print(metrics); print(tuned$best.parameters)

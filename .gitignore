@@ -1,0 +1,8 @@
+.Rhistory
+.RData
+.Rproj.user/
+.DS_Store
+real_estate_data.csv
+bank.csv
+real_estate_results/
+bank_marketing_results/
